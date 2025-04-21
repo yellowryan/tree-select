@@ -3,7 +3,7 @@ import type { RefOptionListProps } from '@rc-component/select/lib/OptionList';
 import type { TreeProps } from '@rc-component/tree';
 import Tree from '@rc-component/tree';
 import { UnstableContext } from '@rc-component/tree';
-import type { EventDataNode, ScrollTo } from '@rc-component/tree/lib/interface';
+import type { DataEntity, EventDataNode, ScrollTo } from '@rc-component/tree/lib/interface';
 import KeyCode from '@rc-component/util/lib/KeyCode';
 import useMemo from '@rc-component/util/lib/hooks/useMemo';
 import * as React from 'react';
@@ -178,14 +178,34 @@ const OptionList: React.ForwardRefRenderFunction<ReviseRefOptionListProps> = (_,
       const isLeaf = (entity.children || []).length === 0;
 
       if (!isLeaf) {
-        const checkableChildren = entity.children.filter(
-          childTreeNode =>
-            !childTreeNode.node.disabled &&
-            !childTreeNode.node.disableCheckbox &&
-            !checkedKeys.includes(childTreeNode.node[fieldNames.value]),
-        );
+        // 需要计算非叶子节点且非禁用状态下包含的children
+        const getLeafCheckableCount = (children: DataEntity<DataNode>[]): number => {
+          let count = 0;
+          const stack = [...children];
 
-        const checkableChildrenCount = checkableChildren.length;
+          while (stack.length > 0) {
+            const current = stack.pop();
+            const currentValue = current.node[fieldNames.value];
+            const currentEntity = valueEntities.get(currentValue);
+            const isCurrentLeaf = (currentEntity.children || []).length === 0;
+
+            if (isCurrentLeaf) {
+              if (
+                !current.node.disabled &&
+                !current.node.disableCheckbox &&
+                !checkedKeys.includes(currentValue)
+              ) {
+                count += 1;
+              }
+            } else {
+              stack.push(...currentEntity.children);
+            }
+          }
+
+          return count;
+        };
+
+        const checkableChildrenCount = getLeafCheckableCount(entity.children);
         disabledCache.set(value, checkableChildrenCount > leftMaxCount);
       } else {
         disabledCache.set(value, false);
